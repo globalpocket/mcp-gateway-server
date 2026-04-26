@@ -89,7 +89,6 @@ class ToolRegistry:
             virtual_tool = {
                 "name": v_name,
                 "description": v_config.get("description", ""),
-                # ※ここではダミー。実際は config 側で inputSchema を定義するか、Pydantic モデルから生成します
                 "inputSchema": v_config.get("inputSchema", {"type": "object", "properties": {}}),
                 "_target_route": v_config.get("target_route"),
                 "_translation_options": v_config.get("translation_options", {})
@@ -105,3 +104,16 @@ class ToolRegistry:
         for tool in self.active_tools.values():
             clean_tool = tool.copy()
             # アンダースコア(_)で始まる内部用のメタデータを取り除き、純粋なMCPフォーマットにする
+            clean_tool = {k: v for k, v in clean_tool.items() if not k.startswith("_")}
+            llm_tools.append(clean_tool)
+        return llm_tools
+
+    def get_tool_routing_info(self, tool_name: str) -> Optional[Dict[str, Any]]:
+        """Data Plane (stdio) がリクエストをルーティングする際に内部情報を取得する"""
+        tool = self.active_tools.get(tool_name)
+        if not tool:
+            return None
+        return {
+            "target_route": tool.get("_target_route"),
+            "translation_options": tool.get("_translation_options", {})
+        }
