@@ -60,6 +60,7 @@ class ToolRegistry:
                 namespaced_tool["name"] = namespaced_name
                 # AIには見せない内部ルーティング用メタデータ
                 namespaced_tool["_target_route"] = f"/mcp/{server_name}"
+                namespaced_tool["_backend_tool_name"] = base_tool_name
                 resolved_tools[namespaced_name] = namespaced_tool
                 
                 # B. ベース名での登録 (ループの順序により、偶然重複した場合は後勝ちになる)
