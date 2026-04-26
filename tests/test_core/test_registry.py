@@ -1,0 +1,95 @@
+import pytest
+import tempfile
+import yaml
+import os
+from mcp_gateway.core.registry import ToolRegistry
+
+# テスト用のダミー設定
+TEST_CONFIG = {
+    "version": "1.0",
+    "virtual_tools": {
+        "run_command": {
+            "description": "Safe sandbox command execution",
+            "target_route": "/mcp/sandbox",
+            "translation_options": {"inject_session_id": True}
+        }
+    },
+    "explicit_routing": {
+        "read_file": "serverA"
+    }
+}
+
+# バックエンドから取得したと想定する生のツールリスト
+MOCK_BACKEND_TOOLS = {
+    "serverA": [
+        {"name": "read_file", "description": "Read file from serverA", "inputSchema": {}},
+        {"name": "run_command", "description": "Raw dangerous command on serverA", "inputSchema": {}}
+    ],
+    "serverB": [
+        {"name": "read_file", "description": "Read file from serverB", "inputSchema": {}},
+        {"name": "search_github", "description": "Search Github", "inputSchema": {}}
+    ]
+}
+
+@pytest.fixture
+def temp_config_file():
+    """テスト用の一時的なYAML設定ファイルを作成する"""
+    fd, path = tempfile.mkstemp(suffix=".yaml")
+    with os.fdopen(fd, 'w') as f:
+        yaml.dump(TEST_CONFIG, f)
+    yield path
+    os.remove(path)
+
+@pytest.fixture
+def registry(temp_config_file):
+    """初期化済みの ToolRegistry インスタンスを提供する"""
+    reg = ToolRegistry(temp_config_file)
+    reg.merge_and_resolve_tools(MOCK_BACKEND_TOOLS)
+    return reg
+
+def test_namespace_prefix_creation(registry):
+    """1. すべてのツールにプレフィックス付きのエイリアスが作成されるか"""
+    llm_tools = registry.get_tools_for_llm()
+    tool_names = [t["name"] for t in llm_tools]
+    
+    assert "serverA_read_file" in tool_names
+    assert "serverB_read_file" in tool_names
+    assert "serverB_search_github" in tool_names
+
+def test_explicit_routing_override(registry):
+    """2. explicit_routing による明示的な上書きが機能しているか"""
+    # configで "read_file" は "serverA" を使うように指定されている
+    routing_info = registry.get_tool_routing_info("read_file")
+    
+    assert routing_info is not None
+    assert routing_info["target_route"] == "/mcp/serverA"
+    
+    # LLM向けリストでも、ベース名の read_file が存在することを確認
+    llm_tools = registry.get_tools_for_llm()
+    base_read_file = next(t for t in llm_tools if t["name"] == "read_file")
+    assert base_read_file["description"] == "Read file from serverA"
+
+def test_virtual_tool_replacement(registry):
+    """3. virtual_tools による危険なツールの安全な置換が機能しているか"""
+    # serverA には生の "run_command" があるが、仮想ツールで上書きされるはず
+    routing_info = registry.get_tool_routing_info("run_command")
+    
+    assert routing_info is not None
+    # ルーティング先が仮想ツールで定義した /mcp/sandbox になっているか
+    assert routing_info["target_route"] == "/mcp/sandbox"
+    assert routing_info["translation_options"] == {"inject_session_id": True}
+
+    llm_tools = registry.get_tools_for_llm()
+    run_cmd = next(t for t in llm_tools if t["name"] == "run_command")
+    # 説明文が仮想ツールのものに差し替わっているか
+    assert run_cmd["description"] == "Safe sandbox command execution"
+
+def test_get_tools_for_llm_hides_metadata(registry):
+    """4. LLMに返すツールリストから内部メタデータ(_target_route等)が隠蔽されているか"""
+    llm_tools = registry.get_tools_for_llm()
+    
+    for tool in llm_tools:
+        # "_" で始まるキーが含まれていないことを確認
+        assert not any(key.startswith("_") for key in tool.keys())
+        assert "name" in tool
+        assert "description" in tool
