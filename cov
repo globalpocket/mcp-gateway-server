@@ -1,0 +1,2 @@
+#!/bin/bash
+PYTHONPATH=src pytest --cov=src/mcp_gateway --cov-report=html tests/
