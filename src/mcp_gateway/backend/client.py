@@ -45,8 +45,16 @@ class BackendClient:
                             logger.info(f"Received POST endpoint for {target_route}: {post_url}")
                         
                         elif event.event == "message":
-                            # メッセージと送信元ルートをハンドラへ渡す
-                            self.message_callback(event.data, target_route)
+                            # SSE受信データのサニタイズ: 正しいJSON-RPCか軽く検証
+                            try:
+                                data = json.loads(event.data)
+                                if not isinstance(data, dict) or data.get("jsonrpc") != "2.0":
+                                    raise ValueError("Missing or invalid 'jsonrpc' field or not a dictionary")
+                                # 検証成功時のみコールバック（stdioへの出力）を実行
+                                self.message_callback(event.data, target_route)
+                            except Exception as e:
+                                # try-catchで握りつぶさず、エラーとしてロギングしてstdioへの流出を防ぐ
+                                logger.error(f"Invalid message format from backend {target_route}: {e} - Raw data: {event.data}")
                             
             except Exception as e:
                 logger.error(f"SSE stream disconnected for {target_route}: {e}")
