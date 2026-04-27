@@ -26,7 +26,7 @@ async def run_admin_api(app):
     await server.serve()
 
 def main():
-    parser = argparse.ArgumentParser(description="MCP Gateway Server")
+    parser = argparse.ArgumentParser(description="MCP Routing Gateway")
     parser.add_argument(
         "--config", 
         default="gateway_config.yaml", 
@@ -34,8 +34,8 @@ def main():
     )
     args = parser.parse_args()
 
-    logger.info(f"Starting MCP Gateway. Loading config from {args.config}")
-
+    logger.info(f"Starting MCP Routing Gateway. Loading config from {args.config}")
+    
     # 1. Registryの初期化と設定読み込み
     registry = ToolRegistry(args.config)
     
