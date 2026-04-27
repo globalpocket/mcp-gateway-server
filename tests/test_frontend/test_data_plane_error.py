@@ -26,3 +26,16 @@ async def test_handle_message_method_not_found(capsys):
     # Method not found (-32601) が返ることを確認
     assert '"code": -32601' in captured.out
     assert "Method not found" in captured.out
+
+@pytest.mark.anyio
+async def test_handle_message_ping(capsys):
+    """ping メソッドに対して正しく空のレスポンスを返すか検証"""
+    server = DataPlaneServer(registry=MagicMock())
+    # ping をリクエスト
+    req = json.dumps({"jsonrpc": "2.0", "id": "ping-test", "method": "ping"})
+    await server._handle_message(req)
+    
+    captured = capsys.readouterr()
+    # 空の result ({}) が返ることを確認
+    assert '"id": "ping-test"' in captured.out
+    assert '"result": {}' in captured.out
