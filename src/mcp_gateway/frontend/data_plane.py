@@ -1,7 +1,9 @@
 import sys
 import json
+import time
 import asyncio
 import logging
+from collections import OrderedDict
 from typing import Dict, Any, Optional
 from mcp_gateway.core.registry import ToolRegistry
 
@@ -17,7 +19,10 @@ class DataPlaneServer:
         self.backend_client = backend_client 
         self._running = False
         # リクエストIDと送信元ルートの対応表（Sampling応答用）
-        self._response_routes: Dict[str, str] = {}
+        # メモリリーク対策としてOrderedDictを使用し、LRUキャッシュ的に管理
+        self._response_routes: OrderedDict[str, Dict[str, Any]] = OrderedDict()
+        self.MAX_ROUTES = 1000
+        self.ROUTE_TIMEOUT = 300 # 5分 (300秒)
         
         # バックエンドからのメッセージをフックして監視する
         if self.backend_client:
@@ -30,8 +35,30 @@ class DataPlaneServer:
             req_id = data.get("id")
             # method が存在する場合は「バックエンドからの要求」
             if req_id is not None and "method" in data:
-                self._response_routes[str(req_id)] = source_route
+                req_id_str = str(req_id)
+                current_time = time.time()
+                
+                # 1. タイムアウトした古いエントリのクリーンアップ
+                while self._response_routes:
+                    oldest_id, info = next(iter(self._response_routes.items()))
+                    if current_time - info["timestamp"] > self.ROUTE_TIMEOUT:
+                        self._response_routes.popitem(last=False)
+                    else:
+                        break
+                
+                # 2. 新しいエントリの記録と末尾への移動 (LRU)
+                self._response_routes[req_id_str] = {
+                    "route": source_route,
+                    "timestamp": current_time
+                }
+                self._response_routes.move_to_end(req_id_str)
+                
+                # 3. 上限サイズを超えたら最も古いもの(先頭)を削除
+                while len(self._response_routes) > self.MAX_ROUTES:
+                    self._response_routes.popitem(last=False)
+                    
         except Exception:
+            # パースに失敗した場合は無視してstdioに流す
             pass
         
         # 本来の責務通り、LLMへ透過的に流す
@@ -129,7 +156,8 @@ class DataPlaneServer:
     async def _forward_response_to_backend(self, res: Dict[str, Any]):
         """AIからの応答を、要求を出した元のバックエンドへ送り返す"""
         req_id = str(res.get("id"))
-        target_route = self._response_routes.pop(req_id, None) # メモリリーク防止のためポップ
+        route_info = self._response_routes.pop(req_id, None) # メモリリーク防止のためポップ
+        target_route = route_info["route"] if route_info else None
         
         if target_route and self.backend_client:
             logger.info(f"Forwarding AI response for ID {req_id} to {target_route}")
