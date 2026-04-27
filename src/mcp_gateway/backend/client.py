@@ -30,6 +30,10 @@ class BackendClient:
 
     async def _stream_task(self, target_route: str):
         """特定のバックエンドに対するSSE接続を維持し、受信したメッセージを横流しする"""
+        # 内部状態が未初期化の場合は初期化（堅牢性の向上とテスト対応）
+        if target_route not in self._streams:
+            self._streams[target_route] = {"ready": asyncio.Event(), "post_url": None, "task": asyncio.current_task()}
+            
         sse_url = f"{self.base_url}{target_route}/sse"
         
         while True:

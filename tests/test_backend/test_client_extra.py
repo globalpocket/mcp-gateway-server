@@ -47,7 +47,7 @@ async def test_client_sanitize_invalid_json(caplog):
     with patch("mcp_gateway.backend.client.aconnect_sse", return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_event_source))):
         # ループを回すためのタスクを立てて少し待機し、すぐにキャンセルする
         task = asyncio.create_task(client._stream_task("/mcp/sanitize"))
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.2) # 反映待ち時間を少し延長
         task.cancel()
         try:
             await task
