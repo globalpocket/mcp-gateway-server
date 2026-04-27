@@ -79,22 +79,39 @@ class BackendClient:
         await self._streams[target_route]["ready"].wait()
         return self._streams[target_route]["post_url"]
 
+    async def _do_post(self, post_url: str, req: Dict[str, Any], target_route: str):
+        """実際にバックエンドへPOSTを行い、エラー時はAIへエラー応答を返す内部メソッド"""
+        try:
+            res = await self.client.post(post_url, json=req)
+            res.raise_for_status() # HTTP 4xx/5xx エラーを捕捉
+        except Exception as e:
+            logger.error(f"Failed to post request to {target_route}: {e}")
+            # JSON-RPC仕様: IDを持たない通知(Notification)にはエラー応答を返さない
+            if req.get("id") is not None:
+                error_res = json.dumps({
+                    "jsonrpc": "2.0",
+                    "id": req.get("id"),
+                    "error": {"code": -32000, "message": f"Gateway Forwarding Error: {e}"}
+                })
+                self.message_callback(error_res, target_route)
+
     async def forward_request(self, target_route: str, req: Dict[str, Any]):
         """AIエージェントからのリクエストをバックエンドへバイパスする"""
         try:
             post_url = await self.ensure_connected(target_route)
             
-            # リクエストをPOSTで投げる(ファイア・アンド・フォーゲット)
-            asyncio.create_task(self.client.post(post_url, json=req))
+            # リクエストをPOSTで投げる(ファイア・アンド・フォーゲットだが、内部エラーは捕捉する)
+            asyncio.create_task(self._do_post(post_url, req, target_route))
             
         except Exception as e:
             logger.error(f"Failed to forward request to {target_route}: {e}")
-            error_res = json.dumps({
-                "jsonrpc": "2.0",
-                "id": req.get("id"),
-                "error": {"code": -32000, "message": f"Gateway Forwarding Error: {e}"}
-            })
-            self.message_callback(error_res, target_route)
+            if req.get("id") is not None:
+                error_res = json.dumps({
+                    "jsonrpc": "2.0",
+                    "id": req.get("id"),
+                    "error": {"code": -32000, "message": f"Gateway Forwarding Error: {e}"}
+                })
+                self.message_callback(error_res, target_route)
 
     async def fetch_tools(self, target_route: str) -> List[Dict[str, Any]]:
         """

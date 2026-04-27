@@ -76,3 +76,20 @@ async def test_client_disconnect():
     
     mock_task.cancel.assert_called_once()
     assert "/mcp/test" not in client._streams
+
+@pytest.mark.anyio
+async def test_client_forward_post_error(caplog):
+    """バックエンドへのPOST転送時にエラー(500等)が出た際、LLMにエラーを返すかを検証"""
+    client = BackendClient()
+    mock_callback = MagicMock()
+    client.message_callback = mock_callback
+    
+    req = {"jsonrpc": "2.0", "id": "req-99", "method": "tools/call"}
+    
+    # client.client.post が例外を投げるようにモック (HTTP 500などを想定)
+    with patch.object(client.client, "post", side_effect=Exception("HTTP 500")):
+        await client._do_post("http://test", req, "/mcp/test")
+        
+    # コールバックが呼ばれ、Gatewayのエラーメッセージが含まれること
+    assert mock_callback.call_count == 1
+    assert "Gateway Forwarding Error: HTTP 500" in mock_callback.call_args[0][0]
