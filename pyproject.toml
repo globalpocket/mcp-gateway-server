@@ -1,7 +1,7 @@
 [project]
-name = "mcp-gateway-server"
+name = "mcp-routing-gateway"
 version = "0.1.0"
-description = "A stateless MCP gateway that acts as a secure facade for AI agents."
+description = "A stateless MCP routing gateway that acts as a secure facade for AI agents."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
