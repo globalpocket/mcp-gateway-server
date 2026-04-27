@@ -126,6 +126,9 @@ class DataPlaneServer:
             elif method == "notifications/cancelled":
                 await self._forward_cancellation_to_backend(req)
                 
+            elif method == "ping":
+                await self._send_response(req_id, {})
+
             elif req_id is not None:
                 await self._send_error(req_id, -32601, f"Method not found: {method}")
 
