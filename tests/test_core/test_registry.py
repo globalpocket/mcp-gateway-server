@@ -15,7 +15,11 @@ TEST_CONFIG = {
     },
     "explicit_routing": {
         "read_file": "serverA"
-    }
+    },
+    "blocked_tools": [
+        "search_github",        # ベース名をブロック
+        "serverA_run_command"   # プレフィックス付きをブロック
+    ]
 }
 
 # バックエンドから取得したと想定する生のツールリスト
@@ -53,6 +57,7 @@ def test_namespace_prefix_creation(registry):
     
     assert "serverA_read_file" in tool_names
     assert "serverB_read_file" in tool_names
+    # serverB_search_github はブロックされていないため存在する
     assert "serverB_search_github" in tool_names
 
 def test_explicit_routing_override(registry):
@@ -108,3 +113,18 @@ def test_deterministic_routing_alphabetical_order(temp_config_file):
     shared = next(t for t in llm_tools if t["name"] == "shared_tool")
     # sorted() 処理により、['serverA', 'serverZ'] の順で評価されるため、必ず Z が後勝ちになる
     assert shared["description"] == "From Z"
+
+def test_explicit_filtering_blocks_tools(registry):
+    """6. blocked_tools によって指定されたツールが正しく隠蔽されているか検証"""
+    llm_tools = registry.get_tools_for_llm()
+    tool_names = [t["name"] for t in llm_tools]
+    
+    # search_github はベース名としてブロックリストに登録されているため、除外されているべき
+    assert "search_github" not in tool_names
+    
+    # serverA_run_command はプレフィックス付きでブロックリストに登録されているため、除外されているべき
+    assert "serverA_run_command" not in tool_names
+    
+    # AI向けに返されないだけでなく、ルーティング情報からも完全に消えていることを確認
+    assert registry.get_tool_routing_info("search_github") is None
+    assert registry.get_tool_routing_info("serverA_run_command") is None

@@ -79,7 +79,9 @@ class ToolRegistry:
 
         # 3. 仮想ツール(Facade) への置き換え [優先度: 最高]
         self.active_tools = self._apply_virtual_tool_replacements(resolved_tools)
-
+        
+        # 4. ブロックツールの削除 (Explicit Filtering: 仕様の Hide tools の実現)
+        self._apply_blocked_tools()
 
     def _create_proxy_tool(self, tool_name: str, target_server: str, raw_tool: Dict[str, Any]) -> Dict[str, Any]:
         """バックエンドのツールをベース名で呼び出せるようにプロキシ化する"""
@@ -114,6 +116,14 @@ class ToolRegistry:
             logger.info(f"Registered virtual tool: {v_name}")
 
         return final_tools
+
+    def _apply_blocked_tools(self):
+        """設定ファイルに定義されたツールをアクティブなツールリストから完全に削除する"""
+        blocked_tools = self.config.get("blocked_tools", [])
+        for tool_name in blocked_tools:
+            if tool_name in self.active_tools:
+                del self.active_tools[tool_name]
+                logger.info(f"Blocked tool removed: {tool_name}")
 
     def get_tools_for_llm(self) -> List[Dict[str, Any]]:
         """Data Plane (stdio) が AIエージェントに返すためのクリーンなツールリストを生成"""
