@@ -12,7 +12,7 @@ class SyncRequest(BaseModel):
 
 def create_admin_api(registry: ToolRegistry, backend_client: BackendClient) -> FastAPI:
     """Control Plane (管理用REST API) のFastAPIアプリケーションを生成する"""
-    app = FastAPI(title="MCP Gateway Admin API")
+    app = FastAPI(title="MCP Routing Gateway Admin API")
 
     @app.post("/admin/routes/sync")
     async def sync_route(req: SyncRequest):
