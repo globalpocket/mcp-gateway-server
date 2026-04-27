@@ -91,3 +91,20 @@ def test_get_tools_for_llm_hides_metadata(registry):
         assert not any(key.startswith("_") for key in tool.keys())
         assert "name" in tool
         assert "description" in tool
+
+def test_deterministic_routing_alphabetical_order(temp_config_file):
+    """5. 辞書の挿入順序に関わらず、アルファベット順による決定的なルーティングが行われるか"""
+    reg = ToolRegistry(temp_config_file)
+    
+    # 辞書の挿入順序をあえて「Zが先、Aが後」にしてマージを試みる
+    unordered_tools_map = {
+        "serverZ": [{"name": "shared_tool", "description": "From Z", "inputSchema": {}}],
+        "serverA": [{"name": "shared_tool", "description": "From A", "inputSchema": {}}]
+    }
+    
+    reg.merge_and_resolve_tools(unordered_tools_map)
+    llm_tools = reg.get_tools_for_llm()
+    
+    shared = next(t for t in llm_tools if t["name"] == "shared_tool")
+    # sorted() 処理により、['serverA', 'serverZ'] の順で評価されるため、必ず Z が後勝ちになる
+    assert shared["description"] == "From Z"

@@ -50,8 +50,9 @@ class ToolRegistry:
         resolved_tools = {}
 
         # 1. プレフィックス付き登録 ＆ 暗黙のベース名（後勝ち）登録
-        for server_name, raw_tools in backend_tools_map.items():
-            for raw_tool in raw_tools:
+        # 決定的なルーティングのため、サーバー名をアルファベット順にソートして処理する
+        for server_name in sorted(backend_tools_map.keys()):
+            for raw_tool in backend_tools_map[server_name]:
                 base_tool_name = raw_tool["name"]
                 
                 # A. プレフィックス付きツールを常に作成 (例: serverA_read_file)
