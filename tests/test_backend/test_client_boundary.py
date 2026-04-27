@@ -13,13 +13,17 @@ async def test_fetch_tools_boundary_conditions():
     mock_event_source = MagicMock()
     mock_event_source.aiter_sse.return_value = mock_aiter_empty()
     
-    with patch("httpx_sse.aconnect_sse", return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_event_source))):
+    # パッチの対象をローカル名前空間に正確に指定する
+    with patch("mcp_gateway.backend.client.aconnect_sse", return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_event_source))):
         tools = await client.fetch_tools("/none")
         assert tools == []
 
     # 2. forward_request 中の例外パス
     with patch.object(client, "ensure_connected", side_effect=Exception("Wait error")):
-        mock_stdout = MagicMock()
-        client.stdout_callback = mock_stdout
+        mock_callback = MagicMock()
+        # 新仕様に合わせて message_callback の方をモックに差し替える
+        client.message_callback = mock_callback
         await client.forward_request("/r", {"id": "err"})
-        assert "Gateway Forwarding Error" in mock_stdout.call_args[0][0]
+        
+        # モックが正しく呼ばれ、エラーメッセージが含まれているか検証
+        assert "Gateway Forwarding Error" in mock_callback.call_args[0][0]
