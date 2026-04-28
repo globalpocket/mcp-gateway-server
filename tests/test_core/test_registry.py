@@ -6,7 +6,7 @@ from mcp_gateway.core.registry import ToolRegistry
 
 # テスト用のダミー設定
 TEST_CONFIG = {
-    "version": "0.2.1",
+    "version": "0.2.2",
     "virtual_tools": {
         "run_command": {
             "description": "Safe sandbox command execution",
