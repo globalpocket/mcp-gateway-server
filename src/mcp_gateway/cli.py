@@ -2,6 +2,7 @@ import sys
 import argparse
 import asyncio
 import logging
+from pathlib import Path
 from mcp_gateway.core.registry import ToolRegistry
 from mcp_gateway.backend.client import BackendClient
 from mcp_gateway.frontend.data_plane import DataPlaneServer
@@ -18,22 +19,44 @@ logger = logging.getLogger(__name__)
 def main():
     parser = argparse.ArgumentParser(description="MCP Routing Gateway")
     parser.add_argument(
+        "--work-dir",
+        default="~/.mcp-gateway",
+        help="Working directory for gateway configuration files (default: ~/.mcp-gateway)"
+    )
+    parser.add_argument(
         "--config", 
         default="gateway_config.json", 
-        help="Path to the gateway configuration JSON file (default: gateway_config.json)"
+        help="Path to the gateway configuration JSON file, relative to work-dir (default: gateway_config.json)"
     )
     parser.add_argument(
         "--mcp-config",
         default="mcp_config.json",
-        help="Path to the standard mcp_config.json file (default: mcp_config.json)"
+        help="Path to the standard mcp_config.json file, relative to work-dir (default: mcp_config.json)"
     )
     args = parser.parse_args()
 
-    logger.info(f"Starting MCP Routing Gateway. Loading config from {args.config}")
+    # ワーキングディレクトリのパス解決 (~ の展開と絶対パス化)
+    work_dir = Path(args.work_dir).expanduser().resolve()
+
+    # 設定ファイルのパス解決 (絶対パス指定の場合はそのまま、相対パスの場合は work_dir 基準)
+    config_path = Path(args.config)
+    if not config_path.is_absolute():
+        config_path = work_dir / config_path
+    config_path = config_path.resolve()
+
+    mcp_config_path = Path(args.mcp_config)
+    if not mcp_config_path.is_absolute():
+        mcp_config_path = work_dir / mcp_config_path
+    mcp_config_path = mcp_config_path.resolve()
+
+    logger.info(f"Starting MCP Routing Gateway.")
+    logger.info(f"Working directory: {work_dir}")
+    logger.info(f"Gateway config path: {config_path}")
+    logger.info(f"MCP config path: {mcp_config_path}")
     
     # 1. Registry と Backend Client の初期化
-    registry = ToolRegistry(args.config)
-    backend_client = BackendClient(mcp_config_path=args.mcp_config)
+    registry = ToolRegistry(str(config_path))
+    backend_client = BackendClient(mcp_config_path=str(mcp_config_path))
     data_plane = DataPlaneServer(registry=registry, backend_client=backend_client)
 
     # 2. 非同期ループで通信を開始

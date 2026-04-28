@@ -29,6 +29,8 @@ pip install -e .
 ## 4. Configuration and Reloading
 
 All configurations are entirely managed in JSON format.
+By default, MCP Routing Gateway uses `~/.mcp-gateway` as its working directory. Place your configuration files in this directory.
+
 **To apply changes to configuration files, simply restart the MCP Routing Gateway process (e.g., by restarting the AI agent).**
 
 ### ① `mcp_config.json` (Backend Definition)
@@ -75,18 +77,37 @@ Controls which tools are presented to the AI and how they are routed. The defaul
 
 ## 5. Usage
 
-Start the gateway using the CLI.
+Start the gateway using the CLI. The gateway will look for configuration files relative to the working directory.
 
 ```bash
-# Basic startup (loading JSON configs from current directory)
-mcp-gateway --config gateway_config.json --mcp-config mcp_config.json
+# Basic startup (Uses ~/.mcp-gateway as the working directory)
+mcp-gateway
+
+# Specify a custom working directory
+mcp-gateway --work-dir /path/to/my-gateway-dir
+
+# Specify custom file names relative to the working directory
+mcp-gateway --work-dir . --config my_gateway_config.json --mcp-config my_mcp_config.json
 ```
 
 *Note: The gateway communicates with the AI agent via `stdio`. All logs are output to `stderr` to avoid polluting the JSON-RPC payload.*
 
 ## 6. AI Agent Integration (Claude Desktop Example)
 
-Register the gateway as a standard `stdio` MCP server in your configuration file.
+Register the gateway as a standard `stdio` MCP server in your AI agent's configuration file. Because AI agents often have their own `mcp_config.json`, the gateway uses a separate working directory (`~/.mcp-gateway` by default) to avoid conflicts.
+
+```json
+{
+  "mcpServers": {
+    "mcp-routing-gateway": {
+      "command": "mcp-gateway",
+      "args": []
+    }
+  }
+}
+```
+
+If you prefer to keep the gateway's config in the same directory as the AI agent's config, use the `--work-dir` and rename the gateway's backend config to avoid conflicts:
 
 ```json
 {
@@ -94,8 +115,8 @@ Register the gateway as a standard `stdio` MCP server in your configuration file
     "mcp-routing-gateway": {
       "command": "mcp-gateway",
       "args": [
-        "--config", "/absolute/path/to/gateway_config.json",
-        "--mcp-config", "/absolute/path/to/mcp_config.json"
+        "--work-dir", ".",
+        "--mcp-config", "gateway_backends.json"
       ]
     }
   }
