@@ -13,11 +13,9 @@ class ToolRegistry:
         self.config = self._load_json(config_path)
         # 最終的にAIに提示し、ルーティングに使用するツールの辞書
         self.active_tools: Dict[str, Dict[str, Any]] = {}
-        # 現在登録されている各バックエンドの生ツールリストを保持する状態マップ
-        self._backend_tools_map: Dict[str, List[Dict[str, Any]]] = {}
 
     def _load_json(self, path: str) -> Dict[str, Any]:
-        """JSONファイルを読み込む。重複するキーはJSONの仕様で自動的に後勝ちになる"""
+        """JSONファイルを読み込む。"""
         try:
             with open(path, 'r', encoding='utf-8') as f:
                 return json.load(f) or {}
@@ -25,41 +23,27 @@ class ToolRegistry:
             logger.error(f"Failed to load config from {path}: {e}")
             return {}
 
-    def add_backend_server(self, server_name: str, raw_tools: List[Dict[str, Any]]):
-        """(Control Plane用) 動的にサーバーを追加・更新し、ルーティングを再計算する"""
-        self._backend_tools_map[server_name] = raw_tools
-        self.merge_and_resolve_tools(self._backend_tools_map)
-        logger.info(f"Added/Updated server '{server_name}'. Total active tools: {len(self.active_tools)}")
-
-    def remove_backend_server(self, server_name: str):
-        """(Control Plane用) 動的にサーバーを削除し、ルーティングを再計算する"""
-        if server_name in self._backend_tools_map:
-            del self._backend_tools_map[server_name]
-            self.merge_and_resolve_tools(self._backend_tools_map)
-            logger.info(f"Removed server '{server_name}'. Total active tools: {len(self.active_tools)}")
-
     def merge_and_resolve_tools(self, backend_tools_map: Dict[str, List[Dict[str, Any]]]):
         """
-        各バックエンドから取得したツールリストを結合し、競合を解決する。
+        各バックエンドから取得したツールリストを結合し、設定に基づいて競合解決・フィルタリングを行う。
+        (起動時に一度だけ呼び出される想定)
         """
         resolved_tools = {}
 
         # 1. プレフィックス付き登録 ＆ 暗黙のベース名（後勝ち）登録
-        # 決定的なルーティングのため、サーバー名をアルファベット順にソートして処理する
         for server_name in sorted(backend_tools_map.keys()):
             for raw_tool in backend_tools_map[server_name]:
                 base_tool_name = raw_tool["name"]
                 
-                # A. プレフィックス付きツールを常に作成 (例: serverA_read_file)
+                # A. プレフィックス付きツール
                 namespaced_name = f"{server_name}_{base_tool_name}"
                 namespaced_tool = raw_tool.copy()
                 namespaced_tool["name"] = namespaced_name
-                # AIには見せない内部ルーティング用メタデータ
                 namespaced_tool["_target_server"] = server_name
                 namespaced_tool["_backend_tool_name"] = base_tool_name
                 resolved_tools[namespaced_name] = namespaced_tool
                 
-                # B. ベース名での登録 (ループの順序により、偶然重複した場合は後勝ちになる)
+                # B. ベース名での登録
                 resolved_tools[base_tool_name] = self._create_proxy_tool(base_tool_name, server_name, raw_tool)
 
         # 2. explicit_routing (明示的なオーバーライド) の適用 [優先度: 高]
@@ -75,11 +59,10 @@ class ToolRegistry:
         # 3. 仮想ツール(Facade) への置き換え [優先度: 最高]
         self.active_tools = self._apply_virtual_tool_replacements(resolved_tools)
         
-        # 4. ブロックツールの削除 (Explicit Filtering: 仕様の Hide tools の実現)
+        # 4. ブロックツールの削除
         self._apply_blocked_tools()
 
     def _create_proxy_tool(self, tool_name: str, target_server: str, raw_tool: Dict[str, Any]) -> Dict[str, Any]:
-        """バックエンドのツールをベース名で呼び出せるようにプロキシ化する"""
         proxy_tool = raw_tool.copy()
         proxy_tool["name"] = tool_name
         proxy_tool["_target_server"] = target_server
@@ -87,7 +70,6 @@ class ToolRegistry:
         return proxy_tool
 
     def _get_raw_tool(self, backend_tools_map: Dict[str, List[Dict[str, Any]]], server_name: str, tool_name: str) -> Optional[Dict[str, Any]]:
-        """特定のサーバーから特定のツール定義を検索する"""
         tools = backend_tools_map.get(server_name, [])
         for tool in tools:
             if tool["name"] == tool_name:
@@ -95,12 +77,10 @@ class ToolRegistry:
         return None
 
     def _apply_virtual_tool_replacements(self, resolved_tools: Dict[str, Any]) -> Dict[str, Any]:
-        """静的設定に定義された仮想ツールをマージ・上書きする"""
         virtual_tools_config = self.config.get("virtual_tools", {})
         final_tools = resolved_tools.copy()
 
         for v_name, v_config in virtual_tools_config.items():
-            # 仮想ツールのスキーマ定義（バックエンドの実体を隠蔽）
             virtual_tool = {
                 "name": v_name,
                 "description": v_config.get("description", ""),
@@ -113,7 +93,6 @@ class ToolRegistry:
         return final_tools
 
     def _apply_blocked_tools(self):
-        """設定ファイルに定義されたツールをアクティブなツールリストから完全に削除する"""
         blocked_tools = self.config.get("blocked_tools", [])
         for tool_name in blocked_tools:
             if tool_name in self.active_tools:
@@ -121,17 +100,14 @@ class ToolRegistry:
                 logger.info(f"Blocked tool removed: {tool_name}")
 
     def get_tools_for_llm(self) -> List[Dict[str, Any]]:
-        """Data Plane が AIエージェントに返すためのクリーンなツールリストを生成"""
         llm_tools = []
         for tool in self.active_tools.values():
             clean_tool = tool.copy()
-            # アンダースコア(_)で始まる内部用のメタデータを取り除き、純粋なMCPフォーマットにする
             clean_tool = {k: v for k, v in clean_tool.items() if not k.startswith("_")}
             llm_tools.append(clean_tool)
         return llm_tools
 
     def get_tool_routing_info(self, tool_name: str) -> Optional[Dict[str, Any]]:
-        """Data Plane がリクエストをルーティングする際に内部情報を取得する"""
         tool = self.active_tools.get(tool_name)
         if not tool:
             return None

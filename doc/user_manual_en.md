@@ -26,11 +26,13 @@ source .venv/bin/activate
 pip install -e .
 ```
 
-## 4. Configuration
+## 4. Configuration and Reloading
 
 All configurations are entirely managed in JSON format.
+**To apply changes to configuration files, simply restart the MCP Routing Gateway process (e.g., by restarting the AI agent).**
 
 ### ① `mcp_config.json` (Backend Definition)
+
 Defines the group of MCP servers (stdio processes) that the Gateway launches and connects to. This follows the standard MCP client configuration format.
 
 ```json
@@ -49,9 +51,8 @@ Defines the group of MCP servers (stdio processes) that the Gateway launches and
 ```
 
 ### ② `gateway_config.json` (Routing & Filter Definition)
-Controls which tools are presented to the AI and how they are routed. 
 
-**Note:** The default file is a minimal `{ "version": "1.0" }`. The following is an **example** of how to define advanced rules:
+Controls which tools are presented to the AI and how they are routed. The default file is a minimal `{ "version": "1.0" }`. The following is an **example** of how to define advanced rules:
 
 ```json
 {
@@ -74,35 +75,14 @@ Controls which tools are presented to the AI and how they are routed.
 
 ## 5. Usage
 
-### Starting the Gateway
-
 Start the gateway using the CLI.
 
 ```bash
 # Basic startup (loading JSON configs from current directory)
 mcp-gateway --config gateway_config.json --mcp-config mcp_config.json
 ```
+
 *Note: The gateway communicates with the AI agent via `stdio`. All logs are output to `stderr` to avoid polluting the JSON-RPC payload.*
-
-### Control Plane API (Admin Interface)
-
-The gateway exposes a REST API at `http://127.0.0.1:8001` for dynamic provisioning.
-
-* **Syncing a Backend Server:**
-    Fetches the latest tool list from the backend session and updates the Registry.
-
-```bash
-curl -X POST [http://127.0.0.1:8001/admin/routes/sync](http://127.0.0.1:8001/admin/routes/sync) \
-     -H "Content-Type: application/json" \
-     -d '{"target_server": "sqlite-server"}'
-```
-
-* **Removing a Backend Server:**
-    Removes the server from the Registry and safely disconnects the session.
-
-```bash
-curl -X DELETE [http://127.0.0.1:8001/admin/routes/sqlite-server](http://127.0.0.1:8001/admin/routes/sqlite-server)
-```
 
 ## 6. AI Agent Integration (Claude Desktop Example)
 

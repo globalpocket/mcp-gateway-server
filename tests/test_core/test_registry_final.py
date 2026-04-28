@@ -14,6 +14,7 @@ def test_explicit_routing_failed_log(caplog):
         "explicit_routing": {"missing_tool": "serverA"}
     }):
         reg = ToolRegistry("dummy.json")
+        # 新しい仕様に合わせて、merge_and_resolve_tools を直接呼び出す
         # serverA を登録するが missing_tool は持たせない
-        reg.add_backend_server("serverA", [{"name": "other", "inputSchema": {}}])
+        reg.merge_and_resolve_tools({"serverA": [{"name": "other", "inputSchema": {}}]})
         assert "Explicit routing failed" in caplog.text

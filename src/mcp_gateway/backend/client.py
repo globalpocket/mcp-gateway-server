@@ -47,11 +47,9 @@ class BackendClient:
 
             server_params = StdioServerParameters(command=command, args=args, env=env)
             
-            # stdio パイプの確立 (AsyncExitStackでライフサイクルを自動管理)
             stdio_transport = await self._exit_stack.enter_async_context(stdio_client(server_params))
             read_stream, write_stream = stdio_transport
             
-            # セッションの確立と初期化
             session = await self._exit_stack.enter_async_context(ClientSession(read_stream, write_stream))
             await session.initialize()
             
@@ -67,7 +65,7 @@ class BackendClient:
         logger.info("All backend connections closed.")
 
     async def call_tool(self, target_server: str, tool_name: str, arguments: dict) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
-        """フロントエンド(Data Plane)からのツール呼び出し要求を、該当バックエンドへ中継する"""
+        """フロントエンドからのツール呼び出し要求を、該当バックエンドへ中継する"""
         session = self.sessions.get(target_server)
         if not session:
             raise ValueError(f"Backend server '{target_server}' is not connected or does not exist.")
@@ -77,7 +75,7 @@ class BackendClient:
         return result.content
 
     async def fetch_tools(self, target_server: str) -> List[Dict[str, Any]]:
-        """(Control Plane / 同期用) バックエンドからツール一覧を取得する"""
+        """(起動初期化用) バックエンドからツール一覧を取得する"""
         session = self.sessions.get(target_server)
         if not session:
             logger.error(f"Backend server '{target_server}' is not connected.")
@@ -85,7 +83,6 @@ class BackendClient:
         
         try:
             tools_result = await session.list_tools()
-            # Registryが処理しやすい辞書のリスト形式に変換
             return [
                 {
                     "name": t.name,
@@ -97,9 +94,3 @@ class BackendClient:
         except Exception as e:
             logger.error(f"Failed to fetch tools from '{target_server}': {e}")
             return []
-
-    def disconnect(self, target_server: str):
-        """特定のバックエンドを切断する"""
-        if target_server in self.sessions:
-            del self.sessions[target_server]
-            logger.info(f"Disconnected server '{target_server}' from active sessions.")
