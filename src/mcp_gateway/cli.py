@@ -20,8 +20,8 @@ def main():
     parser = argparse.ArgumentParser(description="MCP Routing Gateway")
     parser.add_argument(
         "--work-dir",
-        default="~/.mcp-gateway",
-        help="Working directory for gateway configuration files (default: ~/.mcp-gateway)"
+        default="~/.mcp-routing-gateway",
+        help="Working directory for gateway configuration files (default: ~/.mcp-routing-gateway)"
     )
     parser.add_argument(
         "--config", 

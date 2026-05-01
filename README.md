@@ -30,7 +30,7 @@ This project is built on the strict philosophy of being a **"Router and Pure Pro
 
 ## ⚙️ Configuration
 
-All configurations are entirely managed in JSON format. By default, the gateway looks for these files in the working directory `~/.mcp-gateway`. You can change this directory using the `--work-dir` CLI option.
+All configurations are entirely managed in JSON format. By default, the gateway looks for these files in the working directory `~/.mcp-routing-gateway`. You can change this directory using the `--work-dir` CLI option.
 
 1. **`mcp_config.json` (Backend Definition):**
    The standard configuration file format for MCP clients. It defines the group of MCP servers that the Gateway connects to and launches in the background.

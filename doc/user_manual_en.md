@@ -29,7 +29,7 @@ pip install -e .
 ## 4. Configuration and Reloading
 
 All configurations are entirely managed in JSON format.
-By default, MCP Routing Gateway uses `~/.mcp-gateway` as its working directory. Place your configuration files in this directory.
+By default, MCP Routing Gateway uses `~/.mcp-routing-gateway` as its working directory. Place your configuration files in this directory.
 
 **To apply changes to configuration files, simply restart the MCP Routing Gateway process (e.g., by restarting the AI agent).**
 
@@ -54,11 +54,11 @@ Defines the group of MCP servers (stdio processes) that the Gateway launches and
 
 ### ② `gateway_config.json` (Routing & Filter Definition)
 
-Controls which tools are presented to the AI and how they are routed. The default file is a minimal `{ "version": "0.2.3" }`. The following is an **example** of how to define advanced rules:
+Controls which tools are presented to the AI and how they are routed. The default file is a minimal `{ "version": "0.2.4" }`. The following is an **example** of how to define advanced rules:
 
 ```json
 {
-  "version": "0.2.3",
+  "version": "0.2.4",
   "virtual_tools": {
     "safe_query": {
       "description": "Query the database in read-only mode.",
@@ -80,27 +80,27 @@ Controls which tools are presented to the AI and how they are routed. The defaul
 Start the gateway using the CLI. The gateway will look for configuration files relative to the working directory.
 
 ```bash
-# Basic startup (Uses ~/.mcp-gateway as the working directory)
-mcp-gateway
+# Basic startup (Uses ~/.mcp-routing-gateway as the working directory)
+mcp-routing-gateway
 
 # Specify a custom working directory
-mcp-gateway --work-dir /path/to/my-gateway-dir
+mcp-routing-gateway --work-dir /path/to/my-gateway-dir
 
 # Specify custom file names relative to the working directory
-mcp-gateway --work-dir . --config my_gateway_config.json --mcp-config my_mcp_config.json
+mcp-routing-gateway --work-dir . --config my_gateway_config.json --mcp-config my_mcp_config.json
 ```
 
 *Note: The gateway communicates with the AI agent via `stdio`. All logs are output to `stderr` to avoid polluting the JSON-RPC payload.*
 
 ## 6. AI Agent Integration (Claude Desktop Example)
 
-Register the gateway as a standard `stdio` MCP server in your AI agent's configuration file. Because AI agents often have their own `mcp_config.json`, the gateway uses a separate working directory (`~/.mcp-gateway` by default) to avoid conflicts.
+Register the gateway as a standard `stdio` MCP server in your AI agent's configuration file. Because AI agents often have their own `mcp_config.json`, the gateway uses a separate working directory (`~/.mcp-routing-gateway` by default) to avoid conflicts.
 
 ```json
 {
   "mcpServers": {
     "mcp-routing-gateway": {
-      "command": "mcp-gateway",
+      "command": "mcp-routing-gateway",
       "args": []
     }
   }
@@ -113,7 +113,7 @@ If you prefer to keep the gateway's config in the same directory as the AI agent
 {
   "mcpServers": {
     "mcp-routing-gateway": {
-      "command": "mcp-gateway",
+      "command": "mcp-routing-gateway",
       "args": [
         "--work-dir", ".",
         "--mcp-config", "gateway_backends.json"

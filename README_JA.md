@@ -30,7 +30,7 @@ AI Agent (MCP Client) → | [MCP Server] Gateway [MCP Client] | → Backend MCP 
 
 ## ⚙️ 設定 (Configuration)
 
-すべての設定は JSON 形式で完結します。デフォルトでは、ゲートウェイは設定ファイルをワーキングディレクトリである `~/.mcp-gateway` から探します。このディレクトリは CLI オプション `--work-dir` で変更可能です。
+すべての設定は JSON 形式で完結します。デフォルトでは、ゲートウェイは設定ファイルをワーキングディレクトリである `~/.mcp-routing-gateway` から探します。このディレクトリは CLI オプション `--work-dir` で変更可能です。
 
 1. **`mcp_config.json` (バックエンド定義):**
    標準的なMCPクライアントの設定ファイルフォーマットです。Gatewayが背後で接続・起動するMCPサーバー群を定義します。
